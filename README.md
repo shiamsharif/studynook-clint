@@ -5,7 +5,7 @@ StudyNook is a responsive Next.js frontend for discovering, listing, and reservi
 ## Links
 
 - Live URL: `https://your-studynook-client.example.com`
-- Client repository: `https://github.com/your-account/studynook-client`
+- Client repository: `https://github.com/your-account/studynook-clint`
 - Server repository: `https://github.com/your-account/studynook-server`
 
 ## Key features
