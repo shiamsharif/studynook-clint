@@ -7,24 +7,23 @@ import type { RoomInput } from "@/types/api";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Could not add room";
-}
-
 export default function AddRoomPage() {
   const router = useRouter();
 
-  // API orchestration stays at the route level so RoomForm remains reusable
-  // for both room creation and editing workflows.
-  async function handleCreateRoom(input: RoomInput) {
+  // Keep creation and navigation at the route level so the shared form can
+  // also support editing rooms elsewhere in the application.
+  async function save(input: RoomInput) {
     try {
       await roomService.create(input);
       toast.success("Room added successfully");
-
-      // Replace the route so Back does not reopen a successfully submitted form.
-      router.replace("/my-listings");
+      router.push("/my-listings");
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        error instanceof Error ? error.message : "Could not add room",
+      );
+
+      // Preserve the rejection so RoomForm retains the original submit behavior.
+      throw error;
     }
   }
 
@@ -39,7 +38,7 @@ export default function AddRoomPage() {
             they will find inside.
           </p>
 
-          <RoomForm onSubmit={handleCreateRoom} />
+          <RoomForm onSubmit={save} />
         </div>
       </section>
     </ProtectedRoute>
