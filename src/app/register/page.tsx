@@ -1,19 +1,217 @@
 "use client";
 
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
-import { authService } from "@/services/auth";
 import { ApiError } from "@/lib/api";
+import { authService } from "@/services/auth";
 import { LoaderCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { FormEvent, ReactNode } from "react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
-export default function RegisterPage() {
-  const router = useRouter(); const [values, setValues] = useState({ name: "", email: "", photoURL: "", password: "" }); const [errors, setErrors] = useState<Record<string, string>>({}); const [submitting, setSubmitting] = useState(false);
-  const goHome = useCallback(() => router.replace("/"), [router]);
-  function update(key: keyof typeof values, value: string) { setValues((current) => ({ ...current, [key]: value })); }
-  async function submit(event: React.FormEvent) { event.preventDefault(); const next: Record<string, string> = {}; if (!values.name.trim()) next.name = "Name is required"; if (!/^\S+@\S+\.\S+$/.test(values.email)) next.email = "Enter a valid email address"; if (values.photoURL) { try { new URL(values.photoURL); } catch { next.photoURL = "Enter a valid photo URL"; } } if (values.password.length < 8) next.password = "Password must be at least 8 characters"; else if (!/[A-Z]/.test(values.password)) next.password = "Password must include an uppercase letter"; else if (!/[a-z]/.test(values.password)) next.password = "Password must include a lowercase letter"; setErrors(next); if (Object.keys(next).length) return; setSubmitting(true); try { await authService.register({ ...values, name: values.name.trim(), email: values.email.trim(), photoURL: values.photoURL.trim() }); toast.success("Registration successful! Please login."); router.push("/login"); } catch (value) { if (value instanceof ApiError) { const inline = Object.fromEntries(value.validationErrors.map((item) => [item.path ?? item.field ?? "form", item.message])); setErrors({ ...inline, form: value.message }); toast.error(value.message); } else toast.error("Registration failed. Please try again."); } finally { setSubmitting(false); } }
-  return <section className="page-section"><div className="container-shell grid items-center gap-12 lg:grid-cols-2"><div className="hidden lg:block"><p className="eyebrow">Join the reading room</p><h1 className="page-title mt-4">Make space for <em className="text-amber-800">what matters.</em></h1><p className="mt-6 max-w-lg text-lg leading-8 text-stone-600">Create an account to reserve peaceful study rooms and share spaces of your own.</p></div><div className="mx-auto w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl sm:p-8"><span className="grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-800"><UserPlus/></span><h2 className="mt-5 font-serif text-3xl font-semibold">Create your account</h2>{errors.form && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{errors.form}</p>}<form onSubmit={submit} className="mt-6 grid gap-5"><Field label="Full name" error={errors.name}><input className="field-input" autoComplete="name" value={values.name} onChange={(e) => update("name", e.target.value)} placeholder="Avery Morgan"/></Field><Field label="Email" error={errors.email}><input type="email" className="field-input" autoComplete="email" value={values.email} onChange={(e) => update("email", e.target.value)} placeholder="you@example.com"/></Field><Field label="Photo URL (optional)" error={errors.photoURL}><input type="url" className="field-input" value={values.photoURL} onChange={(e) => update("photoURL", e.target.value)} placeholder="https://example.com/photo.jpg"/></Field><Field label="Password" error={errors.password}><input type="password" className="field-input" autoComplete="new-password" value={values.password} onChange={(e) => update("password", e.target.value)} placeholder="8+ characters"/><span className="mt-2 block text-xs text-stone-500">At least 8 characters with uppercase and lowercase letters.</span></Field><button disabled={submitting} className="btn-primary w-full">{submitting && <LoaderCircle className="size-4 animate-spin"/>}{submitting ? "Creating account…" : "Create account"}</button></form><div className="my-6 flex items-center gap-3 text-xs text-stone-400"><span className="h-px flex-1 bg-stone-200"/>OR<span className="h-px flex-1 bg-stone-200"/></div><GoogleLoginButton onSuccess={goHome}/><p className="mt-6 text-center text-sm text-stone-500">Already a member? <Link href="/login" className="font-bold text-amber-800">Sign in</Link></p></div></div></section>;
+interface RegistrationValues {
+  name: string;
+  email: string;
+  photoURL: string;
+  password: string;
 }
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) { return <label><span className="field-label">{label}</span>{children}{error && <span className="field-error">{error}</span>}</label>; }
+
+interface FieldProps {
+  label: string;
+  error?: string;
+  children: ReactNode;
+}
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [values, setValues] = useState<RegistrationValues>({
+    name: "",
+    email: "",
+    photoURL: "",
+    password: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const goHome = useCallback(() => router.replace("/"), [router]);
+
+  function update(key: keyof RegistrationValues, value: string) {
+    setValues((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const next: Record<string, string> = {};
+
+    if (!values.name.trim()) {
+      next.name = "Name is required";
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(values.email)) {
+      next.email = "Enter a valid email address";
+    }
+
+    if (values.photoURL) {
+      try {
+        new URL(values.photoURL);
+      } catch {
+        next.photoURL = "Enter a valid photo URL";
+      }
+    }
+
+    // Keep password checks ordered so the user receives one actionable error.
+    if (values.password.length < 8) {
+      next.password = "Password must be at least 8 characters";
+    } else if (!/[A-Z]/.test(values.password)) {
+      next.password = "Password must include an uppercase letter";
+    } else if (!/[a-z]/.test(values.password)) {
+      next.password = "Password must include a lowercase letter";
+    }
+
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    setSubmitting(true);
+
+    try {
+      await authService.register({
+        ...values,
+        name: values.name.trim(),
+        email: values.email.trim(),
+        photoURL: values.photoURL.trim(),
+      });
+      toast.success("Registration successful! Please login.");
+      router.push("/login");
+    } catch (value) {
+      if (value instanceof ApiError) {
+        // Convert API validation details into the field-error shape used here.
+        const inline = Object.fromEntries(
+          value.validationErrors.map((item) => [
+            item.path ?? item.field ?? "form",
+            item.message,
+          ]),
+        );
+
+        setErrors({ ...inline, form: value.message });
+        toast.error(value.message);
+      } else {
+        toast.error("Registration failed. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="page-section">
+      <div className="container-shell grid items-center gap-12 lg:grid-cols-2">
+        <div className="hidden lg:block">
+          <p className="eyebrow">Join the reading room</p>
+          <h1 className="page-title mt-4">
+            Make space for <em className="text-amber-800">what matters.</em>
+          </h1>
+          <p className="mt-6 max-w-lg text-lg leading-8 text-stone-600">
+            Create an account to reserve peaceful study rooms and share spaces
+            of your own.
+          </p>
+        </div>
+
+        <div className="mx-auto w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl sm:p-8">
+          <span className="grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-800">
+            <UserPlus />
+          </span>
+          <h2 className="mt-5 font-serif text-3xl font-semibold">
+            Create your account
+          </h2>
+
+          {errors.form && (
+            <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+              {errors.form}
+            </p>
+          )}
+
+          <form onSubmit={submit} className="mt-6 grid gap-5">
+            <Field label="Full name" error={errors.name}>
+              <input
+                className="field-input"
+                autoComplete="name"
+                value={values.name}
+                onChange={(event) => update("name", event.target.value)}
+                placeholder="Avery Morgan"
+              />
+            </Field>
+
+            <Field label="Email" error={errors.email}>
+              <input
+                type="email"
+                className="field-input"
+                autoComplete="email"
+                value={values.email}
+                onChange={(event) => update("email", event.target.value)}
+                placeholder="you@example.com"
+              />
+            </Field>
+
+            <Field label="Photo URL (optional)" error={errors.photoURL}>
+              <input
+                type="url"
+                className="field-input"
+                value={values.photoURL}
+                onChange={(event) => update("photoURL", event.target.value)}
+                placeholder="https://example.com/photo.jpg"
+              />
+            </Field>
+
+            <Field label="Password" error={errors.password}>
+              <input
+                type="password"
+                className="field-input"
+                autoComplete="new-password"
+                value={values.password}
+                onChange={(event) => update("password", event.target.value)}
+                placeholder="8+ characters"
+              />
+              <span className="mt-2 block text-xs text-stone-500">
+                At least 8 characters with uppercase and lowercase letters.
+              </span>
+            </Field>
+
+            <button disabled={submitting} className="btn-primary w-full">
+              {submitting && (
+                <LoaderCircle className="size-4 animate-spin" />
+              )}
+              {submitting ? "Creating account…" : "Create account"}
+            </button>
+          </form>
+
+          <div className="my-6 flex items-center gap-3 text-xs text-stone-400">
+            <span className="h-px flex-1 bg-stone-200" />
+            OR
+            <span className="h-px flex-1 bg-stone-200" />
+          </div>
+
+          <GoogleLoginButton onSuccess={goHome} />
+
+          <p className="mt-6 text-center text-sm text-stone-500">
+            Already a member?{" "}
+            <Link href="/login" className="font-bold text-amber-800">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Field({ label, error, children }: FieldProps) {
+  return (
+    <label>
+      <span className="field-label">{label}</span>
+      {children}
+      {error && <span className="field-error">{error}</span>}
+    </label>
+  );
+}
